@@ -59,11 +59,11 @@ class ReferenceMotionState:
         self.body_lin_vel = ref_motion["body_vel"][:, body_ids, :]  # [num_envs, num_markers, 3]
         self.body_ang_vel = ref_motion["body_ang_vel"][:, body_ids, :]  # [num_envs, num_markers, 3]
 
-        # Extended links
-        self.body_pos_extend = ref_motion["rg_pos_t"]
-        self.body_rot_extend = ref_motion["rg_rot_t"]
-        self.body_lin_vel_extend = ref_motion["body_vel_t"]
-        self.body_ang_vel_extend = ref_motion["body_ang_vel_t"]
+        # Extended links (fall back to non-extended if extensions are absent)
+        self.body_pos_extend = ref_motion.get("rg_pos_t", ref_motion["rg_pos"][:, body_ids, :])
+        self.body_rot_extend = ref_motion.get("rg_rot_t", ref_motion["rb_rot"][:, body_ids, :])
+        self.body_lin_vel_extend = ref_motion.get("body_vel_t", ref_motion["body_vel"][:, body_ids, :])
+        self.body_ang_vel_extend = ref_motion.get("body_ang_vel_t", ref_motion["body_ang_vel"][:, body_ids, :])
 
         self.joint_pos = ref_motion["dof_pos"][:, joint_ids]
         self.joint_vel = ref_motion["dof_vel"][:, joint_ids]
@@ -87,6 +87,7 @@ class ReferenceMotionManager:
         random_sample: bool,
         extend_head: bool,
         dt: float,
+        extend_hand: bool = True,
     ):
         """Initializes a reference motion manager that loads and queries a motion dataset.
 
@@ -97,6 +98,7 @@ class ReferenceMotionManager:
             random_sample (bool): Whether to randomly sample the dataset.
             extend_head (bool): Whether to extend the head of the body for specific robots, e.g. H1.
             dt (float): Length of a policy time step, which is the length of a physics time steps multiplied by decimation.
+            extend_hand (bool): Whether to extend virtual hand links. Set False when the robot has physical hand links.
         """
         self._device = device
         self._num_envs = num_envs
@@ -110,6 +112,7 @@ class ReferenceMotionManager:
             fix_height=False,
             multi_thread=False,
             extend_head=extend_head,
+            extend_hand=extend_hand,
         )
 
         self._skeleton_trees = [SkeletonTree.from_mjcf(cfg.skeleton_path)] * self._num_envs

@@ -21,6 +21,7 @@ import yaml
 
 from inference_env.deployment_player import DeploymentPlayer
 from inference_env.neural_wbc_env_cfg_h1 import NeuralWBCEnvCfgH1
+from inference_env.neural_wbc_env_cfg_k1 import NeuralWBCEnvCfgK1
 from inference_env.utils import get_player_args
 
 from neural_wbc.data import get_data_path
@@ -28,6 +29,12 @@ from neural_wbc.data import get_data_path
 # add argparse arguments
 parser = get_player_args(description="Evaluates motion tracking policy and collects metrics in MuJoCo.")
 args_cli = parser.parse_args()
+
+
+def _build_env_cfg(robot: str):
+    if robot == "k1":
+        return NeuralWBCEnvCfgK1(model_xml_path=get_data_path("mujoco/models/scene_k1.xml"))
+    return NeuralWBCEnvCfgH1(model_xml_path=get_data_path("mujoco/models/scene.xml"))
 
 CTRL_FREQ = 200.0
 
@@ -50,21 +57,29 @@ def main():
         print("[INFO]: Using custom configuration:")
         pprint.pprint(custom_config)
 
-    # Delta joint position command of the robot. These will be applied based on the PD positional controller
-    # defined in control.py.
-    joint_pos_cmd = {
-        "right_elbow": 2.0,
-        "left_elbow": -2.0,
-        "torso": 2.0,
-        "right_knee": 2.0,
-        "left_knee": 2.0,
-        "right_ankle": 1.0,
-        "left_ankle": 1.0,
-    }
+    if args_cli.robot == "k1":
+        joint_pos_cmd = {
+            "Right_Elbow_Pitch": 1.5,
+            "Left_Elbow_Pitch": -1.5,
+            "Right_Knee_Pitch": 1.0,
+            "Left_Knee_Pitch": 1.0,
+            "Right_Ankle_Pitch": -0.5,
+            "Left_Ankle_Pitch": -0.5,
+        }
+    else:
+        joint_pos_cmd = {
+            "right_elbow": 2.0,
+            "left_elbow": -2.0,
+            "torso": 2.0,
+            "right_knee": 2.0,
+            "left_knee": 2.0,
+            "right_ankle": 1.0,
+            "left_ankle": 1.0,
+        }
 
     player = DeploymentPlayer(
         args_cli=args_cli,
-        env_cfg=NeuralWBCEnvCfgH1(model_xml_path=get_data_path("mujoco/models/scene.xml")),
+        env_cfg=_build_env_cfg(args_cli.robot),
         custom_config=custom_config,
         demo_mode=True,
     )

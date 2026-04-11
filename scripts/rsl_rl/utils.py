@@ -29,20 +29,18 @@ if TYPE_CHECKING:
 
 
 def get_customized_rsl_rl():
-    """Helper function to ensure the correct version of rsl_rl is imported.
+    """Helper function to ensure HOVER's third_party rsl_rl is imported.
 
-    This function does the following:
-    1. Gets the installed rsl_rl package location and adds it to sys.path
-    2. Removes any existing rsl_rl and submodules from sys.modules to force reimporting
+    Uses the HOVER-bundled rsl_rl rather than any version installed by Isaac Lab,
+    since the API differs significantly between versions.
     """
     import sys
+    import pathlib
 
-    import pkg_resources
+    hover_rsl_rl = str(pathlib.Path(__file__).resolve().parents[2] / "third_party" / "rsl_rl")
+    if hover_rsl_rl not in sys.path:
+        sys.path.insert(0, hover_rsl_rl)
 
-    dist = pkg_resources.require("rsl_rl")[0]
-    sys.path.insert(0, dist.location)
-
-    # Remove 'rsl_rl' from sys.modules if it was already imported
     modules_to_remove = [key for key in sys.modules if key.startswith("rsl_rl")]
     for module in modules_to_remove:
         print(f"Removing {module} from sys.modules")
@@ -55,7 +53,7 @@ def get_player_args(description: str) -> argparse.ArgumentParser:
     parser.add_argument("--env_spacing", type=int, default=5, help="Distance between environments in simulator.")
     parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
     parser.add_argument("--reference_motion_path", type=str, default=None, help="Path to the reference motion dataset.")
-    parser.add_argument("--robot", type=str, choices=["h1", "gr1"], default="h1", help="Robot used in environment")
+    parser.add_argument("--robot", type=str, choices=["h1", "gr1", "k1"], default="h1", help="Robot used in environment")
     parser.add_argument(
         "--student_player", action="store_true", help="Whether the evaluated policy is a student policy."
     )
@@ -88,7 +86,6 @@ def get_ppo_runner_and_checkpoint_path(
     # Try overwrite policy configuration with the content from {log_root_path}/config.json.
     teacher_policy_cfg.overwrite_policy_cfg_from_file(os.path.join(resume_path, "config.json"))
 
-    # load previously trained model
     ppo_runner = OnPolicyRunner(wrapped_env, teacher_policy_cfg.to_dict(), log_dir=log_dir, device=device)
 
     return ppo_runner, checkpoint_path

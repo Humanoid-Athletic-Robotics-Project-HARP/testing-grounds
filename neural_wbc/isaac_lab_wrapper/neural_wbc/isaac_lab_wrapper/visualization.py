@@ -31,26 +31,29 @@ class RefMotionVisualizer:
         self._inactive_ref_motion_markers = None
 
     def _initialize_ref_motion_markers(self):
-        print("Initialize markers for ref motion joints.")
-        # Visualizer for the active reference body positions.
-        active_marker_cfg = DEFORMABLE_TARGET_MARKER_CFG.copy()
-        active_marker_cfg.markers["target"].radius = 0.05
-        active_marker_cfg.markers["target"].visual_material = sim_utils.PreviewSurfaceCfg(
-            diffuse_color=(0.0, 0.0, 1.0)
-        )  # blue
-        active_marker_cfg.prim_path = "/Visuals/Command/active_ref_motion"
-        self._active_ref_motion_markers = VisualizationMarkers(active_marker_cfg)
-        self._active_ref_motion_markers.set_visibility(True)
+        try:
+            print("Initialize markers for ref motion joints.")
+            active_marker_cfg = DEFORMABLE_TARGET_MARKER_CFG.copy()
+            active_marker_cfg.markers["target"].radius = 0.05
+            active_marker_cfg.markers["target"].visual_material = sim_utils.PreviewSurfaceCfg(
+                diffuse_color=(0.0, 0.0, 1.0)
+            )
+            active_marker_cfg.prim_path = "/Visuals/Command/active_ref_motion"
+            self._active_ref_motion_markers = VisualizationMarkers(active_marker_cfg)
+            self._active_ref_motion_markers.set_visibility(True)
 
-        # Visualizere for the inactive reference body positions.
-        inactive_marker_cfg = DEFORMABLE_TARGET_MARKER_CFG.copy()
-        inactive_marker_cfg.markers["target"].radius = 0.03
-        inactive_marker_cfg.markers["target"].visual_material = sim_utils.PreviewSurfaceCfg(
-            diffuse_color=(1.0, 0.0, 0.0)
-        )  # red
-        inactive_marker_cfg.prim_path = "/Visuals/Command/inactive_ref_motion"
-        self._inactive_ref_motion_markers = VisualizationMarkers(inactive_marker_cfg)
-        self._inactive_ref_motion_markers.set_visibility(True)
+            inactive_marker_cfg = DEFORMABLE_TARGET_MARKER_CFG.copy()
+            inactive_marker_cfg.markers["target"].radius = 0.03
+            inactive_marker_cfg.markers["target"].visual_material = sim_utils.PreviewSurfaceCfg(
+                diffuse_color=(1.0, 0.0, 0.0)
+            )
+            inactive_marker_cfg.prim_path = "/Visuals/Command/inactive_ref_motion"
+            self._inactive_ref_motion_markers = VisualizationMarkers(inactive_marker_cfg)
+            self._inactive_ref_motion_markers.set_visibility(True)
+        except Exception as e:
+            print(f"[WARNING] Could not initialize ref motion markers (headless?): {e}")
+            self._active_ref_motion_markers = None
+            self._inactive_ref_motion_markers = None
 
         self._initialized = True
 
@@ -58,7 +61,9 @@ class RefMotionVisualizer:
         if not self._initialized:
             self._initialize_ref_motion_markers()
 
-        # Split the active and inactive body references.
+        if self._active_ref_motion_markers is None:
+            return
+
         if mask is None:
             active_body_pos = ref_motion.body_pos_extend.view(-1, 3)
             device = active_body_pos.device

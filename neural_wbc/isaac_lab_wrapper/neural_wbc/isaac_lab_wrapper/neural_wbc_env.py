@@ -86,6 +86,9 @@ class NeuralWBCEnv(DirectRLEnv):
             )
             self.extend_body_parent_ids = [self._body_names.index(n) for n in parent_names]
             self.extend_body_pos = self.cfg.extend_body_pos.repeat(self.num_envs, 1, 1).to(self.device)
+        else:
+            self.extend_body_parent_ids = None
+            self.extend_body_pos = None
 
         # Get specific body indices
         self.base_id, self.base_name = self.contact_sensor.find_bodies(self.cfg.base_name)
@@ -95,6 +98,8 @@ class NeuralWBCEnv(DirectRLEnv):
 
         self.feet_ids, self.feet_names = self.contact_sensor.find_bodies(self.cfg.feet_name)
         print_config("self.feet_ids", self.feet_names, self.feet_ids)
+
+        self.feet_joint_ids = self.cfg.feet_joint_ids if self.cfg.feet_joint_ids is not None else self.feet_ids
 
         self._undesired_contact_body_ids, undesired_contact_body_name = self.contact_sensor.find_bodies(
             self.cfg.undesired_contact_body_names
@@ -214,13 +219,16 @@ class NeuralWBCEnv(DirectRLEnv):
         }
 
         # Load reference motion
+        _extend_hand = len(self.cfg.extend_body_parent_names) > 0
+        _extend_head = len(self.cfg.extend_body_parent_names) > 0
         self._ref_motion_mgr = ReferenceMotionManager(
             cfg=self.cfg.reference_motion_manager,
             device=self.device,
             num_envs=self.num_envs,
             random_sample=(self.cfg.mode.is_training_mode()),
-            extend_head=True,
+            extend_head=_extend_head,
             dt=self.cfg.decimation * self.cfg.dt,
+            extend_hand=_extend_hand,
         )
         self.ref_episodic_offset = torch.zeros(
             self.num_envs, 3, dtype=torch.float, device=self.device, requires_grad=False

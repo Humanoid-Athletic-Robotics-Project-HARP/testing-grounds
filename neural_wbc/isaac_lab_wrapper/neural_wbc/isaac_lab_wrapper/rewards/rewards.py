@@ -62,6 +62,8 @@ class NeuralWBCRewards:
         self._dt = env.step_dt
 
         self._joint_id_reorder = env._joint_ids
+        self._lower_body_joint_ids = env.cfg.lower_body_joint_ids
+        self._upper_body_joint_ids = env.cfg.upper_body_joint_ids
 
         # In the original implementation in Isaac Gym, the direction of gravity can be configured with an "up axis"
         # parameter. In Isaac Sim, "up axis" is always Z.
@@ -357,8 +359,8 @@ class NeuralWBCRewards:
         Returns:
             torch.Tensor: A float tensor of shape (num_envs) representing the computed penalty for each environment.
         """
-        # Joints 0 - 10 are lower body joints in Isaac Gym.
-        return torch.sum(torch.square(previous_actions[:, :11] - actions[:, :11]), dim=1)
+        ids = self._lower_body_joint_ids
+        return torch.sum(torch.square(previous_actions[:, ids] - actions[:, ids]), dim=1)
 
     def penalize_upper_body_action_changes(
         self,
@@ -374,8 +376,8 @@ class NeuralWBCRewards:
         Returns:
             torch.Tensor: A float tensor of shape (num_envs) representing the computed penalty for each environment.
         """
-        # Joints 11 - 19 are upper body joints in Isaac Gym.
-        return torch.sum(torch.square(previous_actions[:, 11:] - actions[:, 11:]), dim=1)
+        ids = self._upper_body_joint_ids
+        return torch.sum(torch.square(previous_actions[:, ids] - actions[:, ids]), dim=1)
 
     def penalize_by_joint_pos_limits(
         self,

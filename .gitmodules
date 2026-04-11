@@ -5,3 +5,6 @@
   path = third_party/human2humanoid
   url = https://github.com/LeCAR-Lab/human2humanoid
   ignore = dirty
+[submodule "third_party/booster_assets"]
+	path = third_party/booster_assets
+	url = https://github.com/BoosterRobotics/booster_assets

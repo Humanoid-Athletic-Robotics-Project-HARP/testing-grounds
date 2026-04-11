@@ -65,6 +65,7 @@ class NeuralWBCEnvCfg(DirectRLEnvCfg):
 
     base_name: str = MISSING
     feet_name: str | list[str] = MISSING
+    feet_joint_ids: list[int] | None = None
     body_names: list[str] = MISSING
     joint_names: list[str] = MISSING
     tracked_body_names: list[str] = MISSING
