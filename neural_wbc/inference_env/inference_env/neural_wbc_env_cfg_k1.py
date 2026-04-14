@@ -181,3 +181,4 @@ class NeuralWBCEnvCfgK1(NeuralWBCEnvCfg):
     def __post_init__(self):
         self.reference_motion_cfg.motion_path = get_data_path("motions/k1_fight_001.pkl")
         self.reference_motion_cfg.skeleton_path = get_data_path("motion_lib/k1.xml")
+        self.reference_motion_cfg.fk_frame_rotation = [0.5, 0.5, 0.5, 0.5]

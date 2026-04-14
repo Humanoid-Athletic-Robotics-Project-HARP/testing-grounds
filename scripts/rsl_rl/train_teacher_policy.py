@@ -33,12 +33,34 @@ parser.add_argument("--num_envs", type=int, default=None, help="Number of enviro
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--reference_motion_path", type=str, default=None, help="Path to the reference motion dataset.")
 parser.add_argument("--robot", type=str, choices=["h1", "gr1", "k1"], default="h1", help="Robot used in environment")
+parser.add_argument(
+    "--video",
+    action="store_true",
+    default=False,
+    help="Record short RGB clips during training (implies --enable_cameras; use with --headless for offscreen).",
+)
+parser.add_argument(
+    "--video_length",
+    type=int,
+    default=200,
+    help="Number of env steps per recorded clip (passed to gymnasium.RecordVideo).",
+)
+parser.add_argument(
+    "--video_interval",
+    type=int,
+    default=2000,
+    help="Trigger a new clip when the global step count is divisible by this interval.",
+)
 
 # append RSL-RL cli arguments
 TeacherPolicyCfg.add_args_to_parser(parser)
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
+
+# Match Isaac Lab rsl_rl/train.py: cameras must be on for rgb_array / RecordVideo.
+if args_cli.video:
+    args_cli.enable_cameras = True
 
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
@@ -48,6 +70,7 @@ simulation_app = app_launcher.app
 
 from utils import get_customized_rsl_rl, get_ppo_runner_and_checkpoint_path
 
+import gymnasium as gym
 import os
 import torch
 from datetime import datetime
@@ -87,16 +110,29 @@ def main():
 
     teacher_policy_cfg = TeacherPolicyCfg.from_argparse_args(args_cli)
 
-    # Create env and wrap it for RSL RL.
-    env = NeuralWBCEnv(cfg=env_cfg)
-    env = RslRlNeuralWBCVecEnvWrapper(env)
-
-    # specify directory for logging experiments
+    # Log directory first (video clips are written under log_dir/videos/train).
     log_dir = os.path.join(
         os.path.abspath(teacher_policy_cfg.runner.path), datetime.now().strftime("%y_%m_%d_%H-%M-%S")
     )
     os.makedirs(log_dir, exist_ok=True)
     print(f"[INFO] Log directory: {log_dir}")
+
+    # Create env and wrap it for RSL RL.
+    render_mode = "rgb_array" if args_cli.video else None
+    env = NeuralWBCEnv(cfg=env_cfg, render_mode=render_mode)
+    if args_cli.video:
+        video_folder = os.path.join(log_dir, "videos", "train")
+        os.makedirs(video_folder, exist_ok=True)
+        video_kwargs = {
+            "video_folder": video_folder,
+            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+            "video_length": args_cli.video_length,
+            "disable_logger": True,
+        }
+        print("[INFO] Recording videos during training:", video_kwargs)
+        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    env = RslRlNeuralWBCVecEnvWrapper(env)
 
     if teacher_policy_cfg.runner.resume:
         ppo_runner, checkpoint_path = get_ppo_runner_and_checkpoint_path(

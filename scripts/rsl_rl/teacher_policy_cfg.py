@@ -70,7 +70,13 @@ class RunnerCfg:
     num_steps_per_env: int = field(
         default=24, metadata={"description": "Number of steps per environment per iteration."}
     )
-    max_iterations: int = field(default=10000000, metadata={"description": "Maximum number of policy updates."})
+    max_iterations: int = field(
+        default=5000,
+        metadata={
+            "description": "Maximum number of policy updates. "
+            "Raise for full runs (e.g. 50000–80000); default is a shorter dev cap."
+        },
+    )
     save_interval: int = field(default=500, metadata={"description": "Interval for saving checkpoints."})
     checkpoint: str = field(default="", metadata={"description": "Checkpoint to load."})
     resume: bool = field(default=False, metadata={"description": "Whether to resume from a checkpoint."})

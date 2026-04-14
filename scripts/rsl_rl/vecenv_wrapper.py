@@ -30,6 +30,8 @@ The following example shows how to wrap an environment for RSL-RL:
 import gymnasium as gym
 import torch
 
+from typing import Union
+
 from neural_wbc.core import EnvironmentWrapper
 from neural_wbc.isaac_lab_wrapper.neural_wbc_env import NeuralWBCEnv
 
@@ -53,37 +55,40 @@ class RslRlNeuralWBCVecEnvWrapper(EnvironmentWrapper):
         https://github.com/leggedrobotics/rsl_rl/blob/master/rsl_rl/env/vec_env.py
     """
 
-    def __init__(self, env: NeuralWBCEnv):
+    def __init__(self, env: Union[NeuralWBCEnv, gym.Wrapper]):
         """Initializes the wrapper.
 
         Note:
             The wrapper calls :meth:`reset` at the start since the RSL-RL runner does not call reset.
 
         Args:
-            env: The environment to wrap around.
+            env: The environment to wrap around (e.g. :class:`NeuralWBCEnv`, optionally inside
+                :class:`gymnasium.wrappers.RecordVideo`).
         """
-        super().__init__(mode=env.cfg.mode)
+        # Bypass gymnasium wrappers (e.g. RecordVideo) for Isaac Lab / NeuralWBC fields.
+        core = env.unwrapped
+        super().__init__(mode=core.cfg.mode)
 
         # initialize the wrapper
         self._env = env
         # store information required by wrapper
-        self.num_envs = self._env.num_envs
-        self.device = self._env.device
-        self.reference_motion_manager = self._env.reference_motion_manager
-        self.max_episode_length = self._env.max_episode_length
-        if hasattr(self._env, "action_manager"):
-            self.num_actions = self.unwrapped.action_manager.total_action_dim
+        self.num_envs = core.num_envs
+        self.device = core.device
+        self.reference_motion_manager = core.reference_motion_manager
+        self.max_episode_length = core.max_episode_length
+        if hasattr(core, "action_manager"):
+            self.num_actions = core.action_manager.total_action_dim
         else:
-            self.num_actions = self._env.action_space.shape[1]
-        if hasattr(self._env, "observation_manager"):
-            self.num_obs = self._env.observation_manager.group_obs_dim["teacher_policy"][0]
+            self.num_actions = core.action_space.shape[1]
+        if hasattr(core, "observation_manager"):
+            self.num_obs = core.observation_manager.group_obs_dim["teacher_policy"][0]
         else:
-            self.num_obs = self._env.num_observations
+            self.num_obs = core.num_observations
         # -- privileged observations
-        if hasattr(self._env, "observation_manager") and "critic" in self._env.observation_manager.group_obs_dim:
-            self.num_privileged_obs = self._env.observation_manager.group_obs_dim["critic"][0]
-        elif hasattr(self._env, "state_space"):
-            self.num_privileged_obs = self._env.state_space.shape[1]
+        if hasattr(core, "observation_manager") and "critic" in core.observation_manager.group_obs_dim:
+            self.num_privileged_obs = core.observation_manager.group_obs_dim["critic"][0]
+        elif hasattr(core, "state_space"):
+            self.num_privileged_obs = core.state_space.shape[1]
         else:
             self.num_privileged_obs = 0
         # reset at the start since the RSL-RL runner does not call reset
@@ -132,7 +137,7 @@ class RslRlNeuralWBCVecEnvWrapper(EnvironmentWrapper):
 
         This will be the bare :class:`gymnasium.Env` environment, underneath all layers of wrappers.
         """
-        return self._env
+        return self._env.unwrapped
 
     """
     Properties

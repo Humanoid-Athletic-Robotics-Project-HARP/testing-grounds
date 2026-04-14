@@ -15,11 +15,13 @@
 import numpy as np
 import torch
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 # TODO: Replace MotionLibH1 with the agnostic version when it's ready.
 from phc.utils.motion_lib_h1 import MotionLibH1
 from smpl_sim.poselib.skeleton.skeleton3d import SkeletonTree
+
+from neural_wbc.core import math_utils
 
 
 class ReferenceMotionState:
@@ -71,11 +73,16 @@ class ReferenceMotionState:
 
 @dataclass
 class ReferenceMotionManagerCfg:
-    motion_path: str
-    skeleton_path: str
+    motion_path: str = ""
+    skeleton_path: str = ""
+    fk_frame_rotation: Optional[List[float]] = None
+    """Optional wxyz quaternion for MJCF/SMPL axis alignment (typically ``[0.5, 0.5, 0.5, 0.5]`` for K1 AMASS retargeting).
 
-    def __init__(self):
-        pass
+    Applies a *similarity transform* to every cached body quaternion, then
+    aligns cached positions and world-frame velocities to the new root
+    orientation via ``D = R_corr @ R_wrong.T`` about the root position, so
+    reference body poses match the simulator after reset.
+    """
 
 
 class ReferenceMotionManager:
@@ -103,6 +110,15 @@ class ReferenceMotionManager:
         self._device = device
         self._num_envs = num_envs
         self._dt = dt
+
+        if cfg.fk_frame_rotation is not None:
+            q = torch.tensor(cfg.fk_frame_rotation, dtype=torch.float32, device=device)
+            q = q / q.norm()
+            self._fk_q_R = q
+            self._fk_q_R_inv = math_utils.quat_conjugate(q.unsqueeze(0)).squeeze(0)
+        else:
+            self._fk_q_R = None
+            self._fk_q_R_inv = None
 
         self._motion_lib = MotionLibH1(
             motion_file=cfg.motion_path,
@@ -205,5 +221,53 @@ class ReferenceMotionManager:
             for key, value in motion_res.items():
                 if value.shape[-1] == 4:
                     motion_res[key] = value[..., [3, 0, 1, 2]]
+
+        # Apply FK-frame → Isaac-Lab-Z-up correction when configured.
+        # 1) Sandwich all body quaternions (conjugation in the SMPL/MJCF frame).
+        # 2) Rigidly re-express cached world-frame quantities about the root so
+        #    they match the *new* root orientation: the motion cache was built
+        #    with the pre-sandwich root rotation, but the sim is reset with the
+        #    post-sandwich root.  Without this, reference body positions drift
+        #    from the sim by O(1 m) and ``reference_motion_distance`` fires on
+        #    step 1 (episodes ~1–2 steps, joint-velocity tracking rewards ~0).
+        if self._fk_q_R is not None:
+            qR = self._fk_q_R
+            qRi = self._fk_q_R_inv
+            root_rot_before = motion_res["root_rot"].clone()
+            R_wrong = math_utils.matrix_from_quat(root_rot_before)
+            _QUAT_KEYS = {"root_rot", "rb_rot", "rg_rot_t"}
+            for key, value in motion_res.items():
+                if key in _QUAT_KEYS:
+                    orig_shape = value.shape
+                    flat = value.reshape(-1, 4)
+                    qR_exp = qR.unsqueeze(0).expand_as(flat)
+                    qRi_exp = qRi.unsqueeze(0).expand_as(flat)
+                    flat = math_utils.quat_mul(qR_exp, math_utils.quat_mul(flat, qRi_exp))
+                    motion_res[key] = flat.reshape(orig_shape)
+
+            R_corr = math_utils.matrix_from_quat(motion_res["root_rot"])
+            # D maps vectors from the cached FK root frame to the corrected one.
+            D = torch.bmm(R_corr, R_wrong.transpose(-1, -2))
+
+            root_p = motion_res["root_pos"].unsqueeze(1)
+            for pos_key in ("rg_pos", "rg_pos_t"):
+                if pos_key not in motion_res:
+                    continue
+                diff = motion_res[pos_key] - root_p
+                motion_res[pos_key] = root_p + torch.matmul(D.unsqueeze(1), diff.unsqueeze(-1)).squeeze(-1)
+
+            motion_res["root_vel"] = torch.bmm(D, motion_res["root_vel"].unsqueeze(-1)).squeeze(-1)
+            for vkey in ("body_vel", "body_vel_t"):
+                if vkey not in motion_res:
+                    continue
+                v = motion_res[vkey]
+                motion_res[vkey] = torch.matmul(D.unsqueeze(1), v.unsqueeze(-1)).squeeze(-1)
+
+            motion_res["root_ang_vel"] = torch.bmm(D, motion_res["root_ang_vel"].unsqueeze(-1)).squeeze(-1)
+            for wkey in ("body_ang_vel", "body_ang_vel_t"):
+                if wkey not in motion_res:
+                    continue
+                w = motion_res[wkey]
+                motion_res[wkey] = torch.matmul(D.unsqueeze(1), w.unsqueeze(-1)).squeeze(-1)
 
         return ReferenceMotionState(motion_res)

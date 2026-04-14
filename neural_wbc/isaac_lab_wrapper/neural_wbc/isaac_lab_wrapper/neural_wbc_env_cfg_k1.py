@@ -337,8 +337,17 @@ class NeuralWBCEnvCfgK1(NeuralWBCEnvCfg):
         super().__post_init__()
 
         self.rewards = NeuralWBCRewardCfgK1()
-        self.reference_motion_manager.motion_path = get_data_path("motions/k1_fight_001.pkl")
+        # Demo motion may not be shipped; get_data_path raises if missing. CLI can still override after init.
+        for rel in ("motions/k1_fight_001.pkl", "motions/amass_all.pkl"):
+            try:
+                self.reference_motion_manager.motion_path = get_data_path(rel)
+                break
+            except FileNotFoundError:
+                continue
+        else:
+            self.reference_motion_manager.motion_path = ""
         self.reference_motion_manager.skeleton_path = get_data_path("motion_lib/k1.xml")
+        self.reference_motion_manager.fk_frame_rotation = [0.5, 0.5, 0.5, 0.5]
 
         if self.terrain.terrain_generator == HARD_ROUGH_TERRAINS_CFG:
             self.events.update_curriculum.params["penalty_level_up_threshold"] = 125

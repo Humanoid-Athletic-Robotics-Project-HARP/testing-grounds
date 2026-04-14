@@ -250,13 +250,19 @@ class OnPolicyRunner:
 
         log_string += ep_string
 
+        # Remaining wall time: avg seconds per completed iteration × iterations left in this run.
+        tot_iter = locs.get("tot_iter", self.current_learning_iteration + locs["num_learning_iterations"])
+        it = locs["it"]
+        completed = max(1, it - self.current_learning_iteration + 1)
+        remaining_iters = max(0, tot_iter - it - 1)
+        eta_seconds = (self.tot_time / completed) * remaining_iters
+
         log_string += (
             f"""{'-' * width}\n"""
             f"""{'Total timesteps:':>{pad}} {self.tot_timesteps}\n"""
             f"""{'Iteration time:':>{pad}} {iteration_time:.2f}s\n"""
             f"""{'Total time:':>{pad}} {self.tot_time:.2f}s\n"""
-            f"""{'ETA:':>{pad}} {self.format_seconds_to_human_readable(self.tot_time / (locs['it'] + 1) * (
-                               locs['num_learning_iterations'] - locs['it']))}\n"""
+            f"""{'ETA:':>{pad}} {self.format_seconds_to_human_readable(eta_seconds)}\n"""
         )
 
         log_string += f"""path: {self.log_dir}\n"""
