@@ -1,5 +1,0 @@
-**/__pycache__/
-*.egg-info
-logs/
-/data/
-third_party/human2humanoid
