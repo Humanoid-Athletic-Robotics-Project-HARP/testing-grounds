@@ -1,4 +1,8 @@
-[submodule "hover"]
-	path = hover
+[submodule "projects/hover"]
+	path = projects/hover
 	url = https://github.com/kylevansant/HOVER.git
 	branch = kylevansant
+[submodule "projects/him-collaborators"]
+	path = projects/him-collaborators
+	url = https://github.com/HIMRobotics/him-collaborators.git
+	branch = main
