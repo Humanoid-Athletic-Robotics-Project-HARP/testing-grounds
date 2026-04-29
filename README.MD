@@ -16,7 +16,7 @@ Once you've set up locally or on a RunPod, follow these instructions to configur
 
 ## `projects`
 
-Contains running project source code. Some of these folders are submodules (separate repos or forks being actively developed).
+Contains running project source code. Some of these folders are submodules (separate repos or forks being actively developed). Some may be private and thus inaccesible, reach out for access if necessary.
 
 # Setup Instructions
 
