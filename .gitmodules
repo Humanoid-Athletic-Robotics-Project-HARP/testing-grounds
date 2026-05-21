@@ -9,7 +9,7 @@
 [submodule "projects/booster_robotics_sdk"]
 	path = projects/booster_robotics_sdk
 	url = git@github.com:BoosterRobotics/booster_robotics_sdk.git
-[submodule "projects/ttrl-icra2026"]
+[submodule "projects/pace-table-tennis-hitting"]
 	path = projects/pace-table-tennis-hitting
 	url = git@github.com:kylevansant/TTRL-ICRA2026.git
 	branch = feature/k1-tt
